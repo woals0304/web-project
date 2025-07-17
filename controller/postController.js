@@ -14,39 +14,39 @@ const {
 
 // 게시글 작성
 exports.writePost = async (request, response, next) => {
-    const { userid: userId } = request.query;
+    const { userid: userId } = request.headers;
     const { postTitle, postContent, attachFilePath } = request.body;
 
     try {
         if (!postTitle) {
-            const error = new Error(STATUS_MESSAGE.INVALID_POST_TITLE);
-            error.status = STATUS_CODE.BAD_REQUEST;
-            throw error;
-        }
-
-        if (postTitle.length > 26) {
-            const error = new Error(STATUS_MESSAGE.INVALID_POST_TITLE_LENGTH);
-            error.status = STATUS_CODE.BAD_REQUEST;
-            throw error;
-        }
-
-        if (!postContent) {
-            const error = new Error(STATUS_MESSAGE.INVALID_POST_CONTENT);
-            error.status = STATUS_CODE.BAD_REQUEST;
-            throw error;
-        }
-
-        if (postContent.length > 1500) {
-            const error = new Error(STATUS_MESSAGE.INVALID_POST_CONTENT_LENGTH);
-            error.status = STATUS_CODE.BAD_REQUEST;
-            throw error;
-        }
-
+		        const error = new Error(STATUS_MESSAGE.INVALID_POST_TITLE);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+		
+		    if (postTitle.length > 26) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_POST_TITLE_LENGTH);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+		
+		    if (!postContent) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_POST_CONTENT);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+		
+		    if (postContent.length > 1500) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_POST_CONTENT_LENGHT);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+    
         const requestData = {
             userId,
             postTitle,
             postContent,
-            attachFilePath: attachFilePath || null
+            attachFilePath: attachFilePath || null,
         };
         const responseData = await postModel.writePost(requestData);
 
@@ -64,10 +64,10 @@ exports.writePost = async (request, response, next) => {
 
         return response.status(STATUS_CODE.CREATED).json({
             message: STATUS_MESSAGE.WRITE_POST_SUCCESS,
-            data: responseData
+            data: responseData,
         });
     } catch (error) {
-        return next(error);
+        next(error);
     }
 };
 
@@ -125,28 +125,28 @@ exports.getPost = async (request, response, next) => {
 // 게시글 수정
 exports.updatePost = async (request, response, next) => {
     const { post_id: postId } = request.params;
-    const { userid: userId } = request.query;
+    const { userid: userId } = request.headers;
     const { postTitle, postContent, attachFilePath } = request.body;
 
     try {
         if (!postId) {
-            const error = new Error(STATUS_MESSAGE.INVALID_POST_ID);
-            error.status = STATUS_CODE.BAD_REQUEST;
-            throw error;
-        }
-
-        if (postTitle.length > 26) {
-            const error = new Error(STATUS_MESSAGE.INVALID_POST_TITLE_LENGTH);
-            error.status = STATUS_CODE.BAD_REQUEST;
-            throw error;
-        }
-
+		        const error = new Error(STATUS_MESSAGE.INVALID_POST_ID);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+		
+		    if (postTitle.length > 26) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_POST_TITLE_LENGTH);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+    
         const requestData = {
             postId,
             userId,
             postTitle,
             postContent,
-            attachFilePath: attachFilePath || null
+            attachFilePath: attachFilePath || null,
         };
         const responseData = await postModel.updatePost(requestData);
 
@@ -158,10 +158,10 @@ exports.updatePost = async (request, response, next) => {
 
         return response.status(STATUS_CODE.OK).json({
             message: STATUS_MESSAGE.UPDATE_POST_SUCCESS,
-            data: responseData
+            data: responseData,
         });
     } catch (error) {
-        return next(error);
+        next(error);
     }
 };
 
