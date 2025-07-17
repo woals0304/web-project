@@ -1,67 +1,18 @@
-// Dummy data, JSON구조
-const users = [
-    {
-        user_id: 1,
-        email: 'alice@example.com',
-        password: 'Alice@1234',
-        nickname: '앨리스',
-        file_id: 101,
-        session_id: 'sess-abc123',
-        created_at: '2024-12-01T10:00:00Z',
-        updated_at: '2024-12-01T10:00:00Z',
-        deleted_at: null,
-    },
-    {
-        user_id: 2,
-        email: 'bob@example.com',
-        password: 'Bob!pass2024',
-        nickname: '밥',
-        file_id: 102,
-        session_id: 'sess-def456',
-        created_at: '2024-12-02T11:30:00Z',
-        updated_at: '2024-12-02T11:30:00Z',
-        deleted_at: null,
-    },
-    {
-        user_id: 3,
-        email: 'carol@example.com',
-        password: 'Carol#Pass5678',
-        nickname: '캐롤',
-        file_id: null,
-        session_id: null,
-        created_at: '2024-12-03T12:45:00Z',
-        updated_at: '2024-12-03T12:45:00Z',
-        deleted_at: null,
-    },
-    {
-        user_id: 4,
-        email: 'david@example.com',
-        password: 'David*Secure999',
-        nickname: '데이빗',
-        file_id: 103,
-        session_id: 'sess-ghi789',
-        created_at: '2024-12-04T14:15:00Z',
-        updated_at: '2024-12-04T14:15:00Z',
-        deleted_at: null,
-    },
-    {
-        user_id: 5,
-        email: 'eve@example.com',
-        password: 'Eve%Password!1',
-        nickname: '이브',
-        file_id: null,
-        session_id: null,
-        created_at: '2024-12-05T15:20:00Z',
-        updated_at: '2024-12-05T15:20:00Z',
-        deleted_at: null,
-    },
-];
+const userModel = require('../model/userModel.js');
+const {
+    validEmail,
+    validNickname,
+    validPassword,
+} = require('../util/validUtil.js');
+const {
+    STATUS_CODE,
+    STATUS_MESSAGE,
+} = require('../util/constant/httpStatusCode.js');
 
 /**
  * 로그인
  * 회원가입
  * 유저 정보 가져오기
- * 회원 정보 수정
  * 로그인 상태 체크
  * 비밀번호 변경
  * 회원 탈퇴
@@ -71,140 +22,354 @@ const users = [
  */
 
 // 로그인
-exports.loginUser = (request, response) => {
+exports.loginUser = async (request, response, next) => {
     const { email, password } = request.body;
-    const user = users.find(user => user.email === email && user.password === password);
-    if (!user) {
-        return response.status(401).json({ data: null });
+
+    try {
+        if (!email) {
+            const error = new Error(STATUS_MESSAGE.REQUIRED_EMAIL);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        if (!password) {
+            const error = new Error(STATUS_MESSAGE.REQUIRED_PASSWORD);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = {
+            email,
+            password,
+        };
+        const responseData = await userModel.loginUser(requestData, response);
+
+        if (!responseData || responseData === null) {
+            const error = new Error(STATUS_MESSAGE.INVALID_EMAIL_OR_PASSWORD);
+            error.status = STATUS_CODE.UNAUTHORIZED;
+            throw error;
+        }
+        return response.status(STATUS_CODE.OK).json({
+            message: STATUS_MESSAGE.LOGIN_SUCCESS,
+            data: responseData,
+        });
+    } catch (error) {
+        return next(error);
     }
-    return response.status(200).json({ data: user });
 };
 
 // 회원가입
-exports.signupUser = (request, response) => {
-    const { email, password, nickname } = request.body;
-    const existingUser = users.find(user => user.email === email);
-    if (existingUser) {
-        return response.status(400).json({ data: 'duplicate' });
+exports.signupUser = async (request, response, next) => {
+    const { email, password, nickname, profileImagePath } = request.body;
+
+    try {
+        if (!email || !validEmail(email)) {
+            const error = new Error(STATUS_MESSAGE.INVALID_EMAIL);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+        if (!nickname || !validNickname(nickname)) {
+            const error = new Error(STATUS_MESSAGE.INVALID_NICKNAME);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+        if (!password || !validPassword(password)) {
+            const error = new Error(STATUS_MESSAGE.INVALID_PASSWORD);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const reqSignupData = {
+            email,
+            password,
+            nickname,
+            profileImagePath: profileImagePath || null,
+        };
+
+        const resSignupData = await userModel.signUpUser(reqSignupData);
+
+        if (resSignupData === 'already_exist_email') {
+            const error = new Error(STATUS_MESSAGE.ALREADY_EXIST_EMAIL);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        if (resSignupData === null) {
+            const error = new Error(STATUS_MESSAGE.SIGNUP_FAILED);
+            error.status = STATUS_CODE.INTERNAL_SERVER_ERROR;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.CREATED).json({
+            message: STATUS_MESSAGE.SIGNUP_SUCCESS,
+            data: resSignupData
+        });
+    } catch (error) {
+        return next(error);
     }
-
-    const newUser = {
-        user_id: users.length + 1,
-        email,
-        password,
-        nickname,
-        file_id: null,
-        session_id: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        deleted_at: null,
-    };
-
-    users.push(newUser);
-    return response.status(201).json({ data: newUser });
 };
 
 // 유저 정보 가져오기
-exports.getUser = (request, response) => {
-    const userId = parseInt(request.params.user_id, 10);
-    const user = users.find(user => user.user_id === userId);
-    if (!user) {
-        return response.status(404).json({ data: null });
+exports.getUser = async (request, response, next) => {
+    const { user_id: userId } = request.params;
+
+    try {
+        if (!userId) {
+            const error = new Error(STATUS_MESSAGE.INVALID_USER_ID);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = {
+            userId,
+        };
+        const responseData = await userModel.getUser(requestData);
+
+        if (responseData === null) {
+            const error = new Error(STATUS_MESSAGE.NOT_FOUND_USER);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        return response.status(200).json({
+            message: null,
+            data: responseData,
+        });
+    } catch (error) {
+        return next(error);
     }
-    return response.status(200).json({ data: user });
 };
 
 // 회원정보 수정
-exports.updateUser = (request, response) => {
-    const userId = parseInt(request.params.user_id, 10);
-    const { nickname } = request.body;
+exports.updateUser = async (request, response, next) => {
+    const { user_id: userId } = request.params;
+    const { nickname, profileImagePath } = request.body;
 
-    const user = users.find(user => user.user_id === userId);
-    if (!user) {
-        return response.status(404).json({ data: null });
+    try {
+        if (!userId) {
+            const error = new Error(STATUS_MESSAGE.INVALID_USER_ID);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        if (!nickname) {
+            const error = new Error(STATUS_MESSAGE.INVALID_NICKNAME);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = {
+            userId,
+            nickname,
+            profileImagePath,
+        };
+        const responseData = await userModel.updateUser(requestData);
+
+        if (responseData === null) {
+            const error = new Error(STATUS_MESSAGE.NOT_FOUND_USER);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        if (responseData === STATUS_MESSAGE.UPDATE_PROFILE_IMAGE_FAILED) {
+            const error = new Error(STATUS_MESSAGE.UPDATE_PROFILE_IMAGE_FAILED);
+            error.status = STATUS_CODE.INTERNAL_SERVER_ERROR;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.CREATED).json({
+            message: STATUS_MESSAGE.UPDATE_USER_DATA_SUCCESS,
+            data: null,
+        });
+    } catch (error) {
+        return next(error);
     }
-
-    user.nickname = nickname;
-    user.updated_at = new Date().toISOString();
-
-    return response.status(200).json({ data: null });
 };
 
 // 로그인 상태 체크
-exports.checkAuth = (request, response) => {
-    const userId = parseInt(request.headers.userid, 10);
-    const user = users.find(user => user.user_id === userId);
-    if (!user) {
-        return response.status(401).json({ data: null });
-    }
+exports.checkAuth = async (request, response, next) => {
+    const { userid: userId } = request.query;
 
-    return response.status(200).json({
-        data: {
-            userId: user.user_id,
-            email: user.email,
-            nickname: user.nickname,
-            auth_token: user.session_id,
-            auth_status: true,
-        },
-    });
+    try {
+        if (!userId) {
+            const error = new Error(STATUS_MESSAGE.INVALID_USER_ID);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = {
+            userId,
+        };
+
+        const userData = await userModel.getUser(requestData);
+
+        if (!userData) {
+            const error = new Error(STATUS_MESSAGE.NOT_FOUND_USER);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        if (parseInt(userData.userId, 10) !== parseInt(userId, 10)) {
+            const error = new Error(STATUS_MESSAGE.REQUIRED_AUTHORIZATION);
+            error.status = STATUS_CODE.UNAUTHORIZED;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.OK).json({
+            message: null,
+            data: {
+                userId,
+                email: userData.email,
+                nickname: userData.nickname,
+                profileImagePath: userData.profile_image || null,
+                auth_status: true,
+            },
+        });
+    } catch (error) {
+        return next(error);
+    }
 };
 
 // 비밀번호 변경
-exports.changePassword = (request, response) => {
-    const userId = parseInt(request.params.user_id, 10);
+exports.changePassword = async (request, response, next) => {
+    const { user_id: userId } = request.params;
     const { password } = request.body;
 
-    const user = users.find(user => user.user_id === userId);
-    if (!user) {
-        return response.status(404).json({ data: null });
+    try {
+        if (!userId) {
+            const error = new Error(STATUS_MESSAGE.INVALID_USER_ID);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        if (!password || !validPassword(password)) {
+            const error = new Error(STATUS_MESSAGE.INVALID_PASSWORD);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = {
+            userId,
+            password,
+        };
+        const responseData = await userModel.changePassword(requestData);
+
+        if (!responseData) {
+            const error = new Error(STATUS_MESSAGE.NOT_FOUND_USER);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.CREATED).json({
+            message: STATUS_MESSAGE.CHANGE_USER_PASSWORD_SUCCESS,
+            data: null,
+        });
+    } catch (error) {
+        return next(error);
     }
-
-    user.password = password;
-    user.updated_at = new Date().toISOString();
-
-    return response.status(200).json({ data: null });
 };
 
 // 회원 탈퇴
-exports.softDeleteUser = (request, response) => {
-    const userId = parseInt(request.params.user_id, 10);
-    const user = users.find(user => user.user_id === userId);
-    if (!user) {
-        return response.status(404).json({ data: null });
-    }
+exports.softDeleteUser = async (request, response, next) => {
+    const { user_id: userId } = request.params;
 
-    user.deleted_at = new Date().toISOString();
-    return response.status(200).json({ data: null });
+    try {
+        if (!userId) {
+            const error = new Error(STATUS_MESSAGE.INVALID_USER_ID);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = {
+            userId,
+        };
+        const responseData = await userModel.softDeleteUser(requestData);
+
+        if (responseData === null) {
+            const error = new Error(STATUS_MESSAGE.NOT_FOUND_USER);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.OK).json({
+            message: STATUS_MESSAGE.DELETE_USER_DATA_SUCCESS,
+            data: null,
+        });
+    } catch (error) {
+        return next(error);
+    }
 };
 
 // 로그아웃
-exports.logoutUser = (request, response) => {
-    const userId = parseInt(request.headers.userid, 10);
-    const user = users.find(user => user.user_id === userId);
-    if (!user) {
-        return response.status(404).json({ data: null });
-    }
+exports.logoutUser = async (request, response, next) => {
+    const { userid: userId } = request.headers;
 
-    user.session_id = null;
-    return response.status(204).end();
+    try {
+        return response.status(STATUS_CODE.END).json({
+            message: STATUS_MESSAGE.LOGOUT_SUCCESS,
+            data: null,
+        });
+    } catch (error) {
+        return next(error);
+    }
 };
 
 // 이메일 중복 체크
-exports.checkEmail = (request, response) => {
+exports.checkEmail = async (request, response, next) => {
     const { email } = request.query;
-    const user = users.find(user => user.email === email);
-    if (user) {
-        return response.status(400).json({ data: 'duplicate' });
+
+    try {
+        if (!email) {
+            const error = new Error(STATUS_MESSAGE.INVALID_EMAIL);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = { email };
+
+        const resData = await userModel.checkEmail(requestData);
+
+        if (resData === null) {
+            return response.status(STATUS_CODE.OK).json({
+                message: STATUS_MESSAGE.AVAILABLE_EMAIL,
+                data: null,
+            });
+        }
+
+        const error = new Error(STATUS_MESSAGE.ALREADY_EXIST_EMAIL);
+        error.status = STATUS_CODE.BAD_REQUEST;
+        throw error;
+    } catch (error) {
+        return next(error);
     }
-    return response.status(200).json({ data: null });
 };
 
 // 닉네임 중복 체크
-exports.checkNickname = (request, response) => {
+exports.checkNickname = async (request, response, next) => {
     const { nickname } = request.query;
-    const user = users.find(user => user.nickname === nickname);
-    if (user) {
-        return response.status(400).json({ data: 'duplicate' });
+
+    try {
+        if (!nickname) {
+            const error = new Error(STATUS_MESSAGE.INVALID_NICKNAME);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = { nickname };
+
+        const responseData = await userModel.checkNickname(requestData);
+
+        if (!responseData) {
+            return response.status(STATUS_CODE.OK).json({
+                message: STATUS_MESSAGE.AVAILABLE_NICKNAME,
+                data: null,
+            });
+        }
+
+        const error = new Error(STATUS_MESSAGE.ALREADY_EXIST_NICKNAME);
+        error.status = STATUS_CODE.BAD_REQUEST;
+        throw error;
+    } catch (error) {
+        return next(error);
     }
-    return response.status(200).json({ data: null });
 };
