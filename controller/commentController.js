@@ -1,26 +1,8 @@
-// Dummy data, JSON 구조
-const comments = [
-    {
-        comment_id: 1,
-        comment_content: '좋은 글이네요.',
-        post_id: 1,
-        user_id: 2,
-        nickname: '밥',
-        created_at: '2024-12-10T10:00:00Z',
-        updated_at: '2024-12-10T10:00:00Z',
-        deleted_at: null,
-    },
-    {
-        comment_id: 2,
-        comment_content: '감사합니다!',
-        post_id: 1,
-        user_id: 1,
-        nickname: '앨리스',
-        created_at: '2024-12-10T10:05:00Z',
-        updated_at: '2024-12-10T10:05:00Z',
-        deleted_at: null,
-    },
-];
+const commentModel = require('../model/commentModel.js');
+const {
+    STATUS_CODE,
+    STATUS_MESSAGE,
+} = require('../util/constant/httpStatusCode');
 
 /**
  * 댓글 조회
@@ -30,71 +12,198 @@ const comments = [
  */
 
 // 댓글 조회
-exports.getComments = (request, response) => {
-    const postId = parseInt(request.params.post_id, 10);
-    const filteredComments = comments.filter(comment => comment.post_id === postId && !comment.deleted_at);
-    return response.status(200).json({ data: filteredComments });
+exports.getComments = async (request, response, next) => {
+    const { post_id: postId } = request.params;
+
+    try {
+        if (!postId) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_POST_ID);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+    
+        const requestData = {
+            postId,
+        };
+        const responseData = await commentModel.getComments(requestData);
+
+        if (!responseData || responseData.length === 0) {
+            const error = new Error(STATUS_MESSAGE.NOT_A_SINGLE_COMMENT);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.OK).json({
+            message: null,
+            data: responseData,
+        });
+    } catch (error) {
+        return next(error);
+    }
 };
 
 // 댓글 작성
-exports.writeComment = (request, response) => {
-    const postId = parseInt(request.params.post_id, 10);
-    const userId = parseInt(request.headers.userid, 10);
+exports.writeComment = async (request, response, next) => {
+    const { post_id: postId } = request.params;
+    const { userid: userId } = request.query;
     const { commentContent } = request.body;
 
-    const newComment = {
-        comment_id: comments.length + 1,
-        comment_content: commentContent,
-        post_id: postId,
-        user_id: userId,
-        nickname: '사용자',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        deleted_at: null,
-    };
+    try {
+        if (!postId) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_POST_ID);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+		
+		    if (!commentContent) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_COMMENT_CONTENT);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+		
+		    if (commentContent.length > 1000) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_COMMENT_CONTENT_LENGTH);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+    
+        const requestData = {
+            postId,
+            userId,
+            commentContent,
+        };
 
-    comments.push(newComment);
-    return response.status(201).json({ data: newComment });
+        const responseData = await commentModel.writeComment(requestData);
+
+        if (!responseData) {
+            const error = new Error(STATUS_MESSAGE.NOT_A_SINGLE_POST);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        if (responseData === 'insert_error') {
+            const error = new Error(STATUS_MESSAGE.INTERNAL_SERVER_ERROR);
+            error.status = STATUS_CODE.INTERNAL_SERVER_ERROR;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.CREATED).json({
+            message: STATUS_MESSAGE.WRITE_COMMENT_SUCCESS,
+            data: null,
+        });
+    } catch (error) {
+        return next(error);
+    }
 };
 
 // 댓글 수정
-exports.updateComment = (request, response) => {
-    const postId = parseInt(request.params.post_id, 10);
-    const commentId = parseInt(request.params.comment_id, 10);
+exports.updateComment = async (request, response, next) => {
+    const { post_id: postId, comment_id: commentId } = request.params;
+    const { userid: userId } = request.query;
     const { commentContent } = request.body;
 
-    const comment = comments.find(comment =>
-        comment.post_id === postId &&
-        comment.comment_id === commentId &&
-        !comment.deleted_at
-    );
+    try {
+        if (!postId) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_POST_ID);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+		
+		    if (!commentId) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_COMMENT_ID);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+		
+		    if (!commentContent) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_COMMENT_CONTENT);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+		
+		    if (commentContent.length > 1000) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_COMMENT_CONTENT_LENGTH);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+    
+        const requestData = {
+            postId,
+            commentId,
+            userId,
+            commentContent,
+        };
+        const responseData = await commentModel.updateComment(requestData);
 
-    if (!comment) {
-        return response.status(404).json({ data: null });
+        if (!responseData) {
+            const error = new Error(STATUS_MESSAGE.NOT_A_SINGLE_POST);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        if (responseData === 'update_error') {
+            const error = new Error(STATUS_MESSAGE.INTERNAL_SERVER_ERROR);
+            error.status = STATUS_CODE.INTERNAL_SERVER_ERROR;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.OK).json({
+            message: STATUS_MESSAGE.UPDATE_COMMENT_SUCCESS,
+            data: null,
+        });
+    } catch (error) {
+        return next(error);
     }
-
-    comment.comment_content = commentContent;
-    comment.updated_at = new Date().toISOString();
-
-    return response.status(200).json({ data: comment });
 };
 
 // 댓글 삭제
-exports.softDeleteComment = (request, response) => {
-    const postId = parseInt(request.params.post_id, 10);
-    const commentId = parseInt(request.params.comment_id, 10);
+exports.softDeleteComment = async (request, response, next) => {
+    const { post_id: postId, comment_id: commentId } = request.params;
+    const { userid: userId } = request.query;
 
-    const comment = comments.find(comment =>
-        comment.post_id === postId &&
-        comment.comment_id === commentId &&
-        !comment.deleted_at
-    );
+    try {
+        if (!postId) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_POST_ID);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+		
+		    if (!commentId) {
+		        const error = new Error(STATUS_MESSAGE.INVALID_COMMENT_ID);
+		        error.status = STATUS_CODE.BAD_REQUEST;
+		        throw error;
+		    }
+    
+        const requestData = {
+            postId,
+            commentId,
+            userId,
+        };
+        const results = await commentModel.softDeleteComment(requestData);
 
-    if (!comment) {
-        return response.status(404).json({ data: null });
+        if (!results) {
+            const error = new Error(STATUS_MESSAGE.NOT_A_SINGLE_POST);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        if (results === 'no_auth_error') {
+            const error = new Error(STATUS_MESSAGE.REQUIRED_AUTHORIZATION);
+            error.status = STATUS_CODE.UNAUTHORIZED;
+            throw error;
+        }
+
+        if (results === 'delete_error') {
+            const error = new Error(STATUS_MESSAGE.INTERNAL_SERVER_ERROR);
+            error.status = STATUS_CODE.INTERNAL_SERVER_ERROR;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.OK).json({
+            message: STATUS_MESSAGE.DELETE_COMMENT_SUCCESS,
+            data: null,
+        });
+    } catch (error) {
+        return next(error);
     }
-
-    comment.deleted_at = new Date().toISOString();
-
-    return response.status(200).json({ data: null });
 };

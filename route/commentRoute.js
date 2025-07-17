@@ -1,6 +1,5 @@
 const express = require('express');
 const commentController = require('../controller/commentController.js');
-
 const router = express.Router();
 
 router.get(

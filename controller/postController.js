@@ -1,32 +1,8 @@
-// Dummy data, JSON 구조
-const posts = [
-    {
-        post_id: 1,
-        post_title: '첫 번째 게시글',
-        post_content: '첫 번째 내용입니다.',
-        user_id: 1,
-        nickname: '앨리스',
-        like: 0,
-        comment_count: 0,
-        hits: 10,
-        created_at: '2024-12-10T10:00:00Z',
-        updated_at: '2024-12-10T10:00:00Z',
-        deleted_at: null,
-    },
-    {
-        post_id: 2,
-        post_title: '두 번째 글',
-        post_content: '내용이 있습니다.',
-        user_id: 2,
-        nickname: '밥',
-        like: 2,
-        comment_count: 1,
-        hits: 15,
-        created_at: '2024-12-11T11:00:00Z',
-        updated_at: '2024-12-11T11:00:00Z',
-        deleted_at: null,
-    },
-];
+const postModel = require('../model/postModel.js');
+const {
+    STATUS_CODE,
+    STATUS_MESSAGE
+} = require('../util/constant/httpStatusCode');
 
 /**
  * 게시글 작성
@@ -37,71 +13,185 @@ const posts = [
  */
 
 // 게시글 작성
-exports.writePost = (request, response) => {
-    const userId = parseInt(request.headers.userid, 10);
-    const { postTitle, postContent } = request.body;
+exports.writePost = async (request, response, next) => {
+    const { userid: userId } = request.query;
+    const { postTitle, postContent, attachFilePath } = request.body;
 
-    const newPost = {
-        post_id: posts.length + 1,
-        post_title: postTitle,
-        post_content: postContent,
-        user_id: userId,
-        nickname: '사용자', // 실제 구현에서는 유저 정보에서 가져옴
-        like: 0,
-        comment_count: 0,
-        hits: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        deleted_at: null,
-    };
+    try {
+        if (!postTitle) {
+            const error = new Error(STATUS_MESSAGE.INVALID_POST_TITLE);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
 
-    posts.push(newPost);
-    return response.status(201).json({ data: newPost });
+        if (postTitle.length > 26) {
+            const error = new Error(STATUS_MESSAGE.INVALID_POST_TITLE_LENGTH);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        if (!postContent) {
+            const error = new Error(STATUS_MESSAGE.INVALID_POST_CONTENT);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        if (postContent.length > 1500) {
+            const error = new Error(STATUS_MESSAGE.INVALID_POST_CONTENT_LENGTH);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = {
+            userId,
+            postTitle,
+            postContent,
+            attachFilePath: attachFilePath || null
+        };
+        const responseData = await postModel.writePost(requestData);
+
+        if (responseData === STATUS_MESSAGE.NOT_FOUND_USER) {
+            const error = new Error(STATUS_MESSAGE.NOT_FOUND_USER);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        if (!responseData) {
+            const error = new Error(STATUS_MESSAGE.WRITE_POST_FAILED);
+            error.status = STATUS_CODE.INTERNAL_SERVER_ERROR;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.CREATED).json({
+            message: STATUS_MESSAGE.WRITE_POST_SUCCESS,
+            data: responseData
+        });
+    } catch (error) {
+        return next(error);
+    }
 };
 
 // 게시글 목록 조회
-exports.getPosts = (request, response) => {
-    return response.status(200).json({ data: posts.filter(post => !post.deleted_at) });
+exports.getPosts = async (request, response, next) => {
+    try {
+        const responseData = await postModel.getPosts();
+
+        if (!responseData || responseData.length === 0) {
+            const error = new Error(STATUS_MESSAGE.NOT_A_SINGLE_POST);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.OK).json({
+            message: STATUS_MESSAGE.GET_POSTS_SUCCESS,
+            data: responseData
+        });
+    } catch (error) {
+        next(error);
+    }
 };
 
 // 게시글 상세 조회
-exports.getPost = (request, response) => {
-    const postId = parseInt(request.params.post_id, 10);
-    const post = posts.find(post => post.post_id === postId && !post.deleted_at);
+exports.getPost = async (request, response, next) => {
+    const { post_id: postId } = request.params;
 
-    if (!post) {
-        return response.status(404).json({ data: null });
+    try {
+        if (!postId) {
+            const error = new Error(STATUS_MESSAGE.INVALID_POST_ID);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = {
+            postId
+        };
+        const responseData = await postModel.getPost(requestData, response);
+
+        if (!responseData) {
+            const error = new Error(STATUS_MESSAGE.NOT_A_SINGLE_POST);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.OK).json({
+            message: null,
+            data: responseData
+        });
+    } catch (error) {
+        return next(error);
     }
-
-    post.hits += 1;
-    return response.status(200).json({ data: post });
 };
 
 // 게시글 수정
-exports.updatePost = (request, response) => {
-    const postId = parseInt(request.params.post_id, 10);
-    const { postTitle, postContent } = request.body;
+exports.updatePost = async (request, response, next) => {
+    const { post_id: postId } = request.params;
+    const { userid: userId } = request.query;
+    const { postTitle, postContent, attachFilePath } = request.body;
 
-    const post = posts.find(post => post.post_id === postId && !post.deleted_at);
-    if (!post) {
-        return response.status(404).json({ data: null });
+    try {
+        if (!postId) {
+            const error = new Error(STATUS_MESSAGE.INVALID_POST_ID);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        if (postTitle.length > 26) {
+            const error = new Error(STATUS_MESSAGE.INVALID_POST_TITLE_LENGTH);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = {
+            postId,
+            userId,
+            postTitle,
+            postContent,
+            attachFilePath: attachFilePath || null
+        };
+        const responseData = await postModel.updatePost(requestData);
+
+        if (!responseData) {
+            const error = new Error(STATUS_MESSAGE.NOT_A_SINGLE_POST);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.OK).json({
+            message: STATUS_MESSAGE.UPDATE_POST_SUCCESS,
+            data: responseData
+        });
+    } catch (error) {
+        return next(error);
     }
-
-    post.post_title = postTitle;
-    post.post_content = postContent;
-    post.updated_at = new Date().toISOString();
-
-    return response.status(200).json({ data: post });
 };
 
 // 게시글 삭제
-exports.softDeletePost = (request, response) => {
-    const postId = parseInt(request.params.post_id, 10);
-    const post = posts.find(post => post.post_id === postId && !post.deleted_at);
-    if (!post) {
-        return response.status(404).json({ data: null });
-    }
+exports.softDeletePost = async (request, response, next) => {
+    const { post_id: postId } = request.params;
 
-    post.deleted_at = new Date().toISOString();
-    return response.status(200).json({ data: null });
+    try {
+        if (!postId) {
+            const error = new Error(STATUS_MESSAGE.INVALID_POST_ID);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
+        const requestData = {
+            postId
+        };
+        const results = await postModel.softDeletePost(requestData);
+
+        if (!results) {
+            const error = new Error(STATUS_MESSAGE.NOT_A_SINGLE_POST);
+            error.status = STATUS_CODE.NOT_FOUND;
+            throw error;
+        }
+
+        return response.status(STATUS_CODE.OK).json({
+            message: STATUS_MESSAGE.DELETE_POST_SUCCESS,
+            data: null
+        });
+    } catch (error) {
+        return next(error);
+    }
 };
