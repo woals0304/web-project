@@ -17,11 +17,11 @@ exports.getComments = async (request, response, next) => {
 
     try {
         if (!postId) {
-		        const error = new Error(STATUS_MESSAGE.INVALID_POST_ID);
-		        error.status = STATUS_CODE.BAD_REQUEST;
-		        throw error;
-		    }
-    
+            const error = new Error(STATUS_MESSAGE.INVALID_POST_ID);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+
         const requestData = {
             postId,
         };
@@ -45,7 +45,7 @@ exports.getComments = async (request, response, next) => {
 // 댓글 작성
 exports.writeComment = async (request, response, next) => {
     const { post_id: postId } = request.params;
-    const { userid: userId } = request.query;
+    const { userid: userId } = request.headers;
     const { commentContent } = request.body;
 
     try {
@@ -99,7 +99,7 @@ exports.writeComment = async (request, response, next) => {
 // 댓글 수정
 exports.updateComment = async (request, response, next) => {
     const { post_id: postId, comment_id: commentId } = request.params;
-    const { userid: userId } = request.query;
+    const { userid: userId } = request.headers;
     const { commentContent } = request.body;
 
     try {
@@ -159,7 +159,7 @@ exports.updateComment = async (request, response, next) => {
 // 댓글 삭제
 exports.softDeleteComment = async (request, response, next) => {
     const { post_id: postId, comment_id: commentId } = request.params;
-    const { userid: userId } = request.query;
+    const { userid: userId } = request.headers;
 
     try {
         if (!postId) {
@@ -173,7 +173,7 @@ exports.softDeleteComment = async (request, response, next) => {
 		        error.status = STATUS_CODE.BAD_REQUEST;
 		        throw error;
 		    }
-    
+	    
         const requestData = {
             postId,
             commentId,
