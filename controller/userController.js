@@ -30,16 +30,15 @@ exports.loginUser = async (request, response, next) => {
 
     try {
         if (!email) {
-		        const error = new Error(STATUS_MESSAGE.REQUIRED_EMAIL);
-		        error.status = STATUS_CODE.BAD_REQUEST;
-		        throw error;
-		    }
-		
-		    if (!password) {
-		        const error = new Error(STATUS_MESSAGE.REQUIRED_PASSWORD);
-		        error.status = STATUS_CODE.BAD_REQUEST;
-		        throw error;
-		    }
+            const error = new Error(STATUS_MESSAGE.REQUIRED_EMAIL);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
+        if (!password) {
+            const error = new Error(STATUS_MESSAGE.REQUIRED_PASSWORD);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
     
         const requestData = {
             email,
@@ -198,10 +197,10 @@ exports.checkAuth = async (request, response, next) => {
 
     try {
         if (!userId) {
-		        const error = new Error(STATUS_MESSAGE.INVALID_USER_ID);
-		        error.status = STATUS_CODE.BAD_REQUEST;
-		        throw error;
-		    }
+            const error = new Error(STATUS_MESSAGE.INVALID_USER_ID);
+            error.status = STATUS_CODE.BAD_REQUEST;
+            throw error;
+        }
     
         const requestData = {
             userId,
